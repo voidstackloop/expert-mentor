@@ -39,7 +39,7 @@ except ImportError:  # when imported without scripts/ on sys.path
     import mentor_cards
 
 APP_NAME = "expert-mentor"
-__version__ = "0.6.0"
+__version__ = "0.6.1"
 
 
 def _resource_dir(*parts: str) -> Path:

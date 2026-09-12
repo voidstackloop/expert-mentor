@@ -6,6 +6,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-09-12
+
+### Changed
+- Package the README as the PyPI long description and ship `docs/` in the sdist.
+- Add a `MANIFEST.in` so documentation is included in source distributions.
+
 ## [0.6.0] - 2026-09-12
 
 ### Added
@@ -42,7 +48,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   profiles, curriculum and compact templates, one-command installer, and the
   `SKILL.md` agent skill.
 
-[Unreleased]: https://github.com/voidstackloop/expert-mentor/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/voidstackloop/expert-mentor/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/voidstackloop/expert-mentor/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/voidstackloop/expert-mentor/releases/tag/v0.6.0
 [0.5.0]: https://github.com/voidstackloop/expert-mentor/releases
 [0.1.0]: https://github.com/voidstackloop/expert-mentor/releases
