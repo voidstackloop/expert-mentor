@@ -80,7 +80,7 @@ expert-mentor = "expert_mentor:cli"
 
 [tool.setuptools]
 package-dir = { "" = "scripts" }
-py-modules = ["expert_mentor", "mentor_runtime", "mentor_memory"]
+py-modules = ["expert_mentor", "mentor_runtime", "mentor_memory", "mentor_cards"]
 
 [tool.setuptools.dynamic]
 version = { attr = "expert_mentor.__version__" }
