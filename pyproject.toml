@@ -68,9 +68,11 @@ classifiers = [
 dynamic = ["version"]
 
 [project.urls]
-Homepage = "https://pypi.org/project/expert-mentor/"
-# Uncomment and set once the GitHub repo exists:
-# Repository = "https://github.com/<owner>/expert-mentor"
+Homepage = "https://github.com/voidstackloop/expert-mentor"
+Repository = "https://github.com/voidstackloop/expert-mentor"
+Issues = "https://github.com/voidstackloop/expert-mentor/issues"
+Changelog = "https://github.com/voidstackloop/expert-mentor/releases"
+"PyPI" = "https://pypi.org/project/expert-mentor/"
 
 [project.scripts]
 mentor = "expert_mentor:cli"
