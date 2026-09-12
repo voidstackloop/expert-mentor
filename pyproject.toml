@@ -5,46 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "expert-mentor"
 description = "Turn any LLM (Claude, ChatGPT, Gemini, Ollama, llama.cpp) into a professional teacher for any field."
-readme = { content-type = "text/markdown", text = """
-# expert-mentor
-
-Turn any capable LLM — Claude, ChatGPT, Gemini, or a local Ollama / llama.cpp
-model — into a **professional teacher for any field**.
-
-`expert-mentor` generates a calibrated expert-mentor system prompt for a given
-field and level, runs the tutoring session directly, remembers what the learner
-has mastered across sessions, and assesses progress from the transcript.
-
-## Highlights
-
-- **Provider-native prompts** — XML-shaped, prompt-cached system blocks for
-  Claude; `developer` role, `max_completion_tokens`, and `reasoning_effort` for
-  ChatGPT reasoning models.
-- **Live sessions** over Anthropic, OpenAI, Ollama, and llama.cpp (standard
-  library only, no `pip install` needed to run).
-- **Persistent learner memory** — mastered / shaky / misconceptions / open
-  questions, injected into every future session.
-- **Model-assisted review** — turn a session transcript into an updated profile.
-- **Curriculum design**, saved mentors, live model discovery, and a config file.
-- **Zero runtime dependencies**; Python 3.8+.
-
-## Install
-
-```bash
-pipx install expert-mentor      # or: pip install expert-mentor
-mentor --field "quantum computing" --level beginner
-```
-
-## Quick start
-
-```bash
-mentor run --field "Rust" --provider claude --remember
-mentor curriculum --field "Rust" --duration "6 weeks"
-mentor fields
-```
-
-MIT licensed.
-""" }
+readme = "README.md"
 requires-python = ">=3.8"
 license = { text = "MIT" }
 authors = [{ name = "expert-mentor contributors" }]
