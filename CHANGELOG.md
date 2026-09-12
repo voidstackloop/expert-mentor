@@ -6,6 +6,20 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+- Live sessions for Google/Gemini (`mentor run --provider google`), on par with
+  Anthropic, OpenAI, Ollama, and llama.cpp.
+- `mentor skill` — install the Claude Code / opencode skill from the CLI
+  itself, so a `pip`/`pipx` install gets it too, not just a git checkout.
+- `examples/cpp.google.transcript.md` — a live Gemini tutoring transcript.
+
+### Fixed
+- `google`'s default model was the retired `gemini-2.5-pro`; now the rolling
+  `gemini-flash-latest` alias.
+
+### Changed
+- `install.sh` now calls `mentor skill` instead of duplicating its symlink logic.
+
 ## [0.6.1] - 2026-09-12
 
 ### Changed

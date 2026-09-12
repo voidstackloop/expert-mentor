@@ -200,13 +200,14 @@ def main() -> int:
     check("openai carries max_tokens", mr.build_openai_payload("m", "sys", [])["max_tokens"] == 2048)
 
     print("\nrun dry-run:")
-    for provider in ("ollama", "openai", "anthropic"):
+    required_key = {"ollama": "model", "openai": "model", "anthropic": "model", "google": "contents"}
+    for provider in ("ollama", "openai", "anthropic", "google"):
         buf = io.StringIO()
         with _rso(buf):
             code = em.main(["run", "--field", "Rust", "--provider", provider, "--dry-run", "--once", "hi"])
         try:
             payload = json.loads(buf.getvalue())
-            check(f"{provider} dry-run valid json", code == 0 and "model" in payload)
+            check(f"{provider} dry-run valid json", code == 0 and required_key[provider] in payload)
         except json.JSONDecodeError:
             check(f"{provider} dry-run valid json", False)
     with _rso(io.StringIO()):
@@ -326,6 +327,31 @@ def main() -> int:
             check("replace updates back", store.add("rusty", "What is a borrow?", "An alias.").back == "An alias.")
         finally:
             em.CONFIG_DIR = old_config
+
+    print("\nskill install:")
+    with tempfile.TemporaryDirectory() as tmp:
+        target_root = Path(tmp)
+        with _rso(io.StringIO()):
+            code = em.main(["skill", "--dir", str(target_root)])
+        check("skill install exit 0", code == 0)
+        check("SKILL.md placed", (target_root / "expert-mentor" / "SKILL.md").exists())
+        with _rso(io.StringIO()):
+            code = em.main(["skill", "--dir", str(target_root)])
+        check("re-running is idempotent (no --force needed)", code == 0)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        foreign_root = Path(tmp)
+        foreign = foreign_root / "expert-mentor"
+        foreign.mkdir()
+        (foreign / "something-else.txt").write_text("x")
+        with _rso(io.StringIO()):
+            code = em.main(["skill", "--dir", str(foreign_root)])
+        check("foreign dir without --force is skipped (exit 1)", code == 1)
+        check("foreign dir left untouched", (foreign / "something-else.txt").exists())
+        with _rso(io.StringIO()):
+            code = em.main(["skill", "--dir", str(foreign_root), "--force"])
+        check("--force overwrites the foreign dir", code == 0)
+        check("SKILL.md now present", (foreign / "SKILL.md").exists())
 
     print(f"\n{PASS} passed, {FAIL} failed")
     return 1 if FAIL else 0

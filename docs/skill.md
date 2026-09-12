@@ -6,19 +6,24 @@ usable inside Claude Code and opencode, not just as a CLI.
 
 ## Install
 
-`./install.sh` links the skill into the standard locations automatically:
+```bash
+mentor skill
+```
+
+Works whether `mentor` came from a git checkout or from `pip install`/`pipx
+install`. From a checkout it symlinks the whole repo into the standard
+locations (so it stays live as you edit the repo):
 
 ```
 ~/.claude/skills/expert-mentor       -> <repo>
 ~/.config/opencode/skills/expert-mentor -> <repo>
 ```
 
-Manual equivalent:
-
-```bash
-ln -sfn ~/projects/expert-mentor ~/.claude/skills/expert-mentor
-ln -sfn ~/projects/expert-mentor ~/.config/opencode/skills/expert-mentor
-```
+From a pip/pipx install (no repo to point at) it copies the bundled
+`SKILL.md`, `templates/`, and `references/` into the same locations instead.
+Add `--dir PATH` to install elsewhere, or `--force` to replace a directory
+that already exists there for another reason. `./install.sh` still does the
+same thing as part of its full one-shot setup (launcher + PATH + skill).
 
 Restart the host (opencode loads skills at startup) so it picks up the new skill.
 

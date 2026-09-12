@@ -31,6 +31,7 @@ DEFAULT_LLAMACPP_HOST = os.environ.get("LLAMACPP_HOST", "http://localhost:8080")
 OPENAI_BASE = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
 ANTHROPIC_BASE = os.environ.get("ANTHROPIC_BASE_URL", "https://api.anthropic.com")
 ANTHROPIC_VERSION = "2023-06-01"
+GOOGLE_BASE = os.environ.get("GOOGLE_BASE_URL", "https://generativelanguage.googleapis.com")
 
 RETRY_STATUS = {408, 409, 429, 500, 502, 503, 504, 529}
 OPENAI_REASONING = re.compile(r"^(o[1-9]|gpt-5|gpt-6)")
@@ -52,7 +53,7 @@ DEFAULT_MODELS = {
     "openai": "gpt-5.6",
     "ollama": "llama3.1:8b",
     "llamacpp": "local-gguf",
-    "google": "gemini-2.5-pro",
+    "google": "gemini-flash-latest",
     "generic": "any capable model",
 }
 
@@ -80,6 +81,11 @@ MODEL_CATALOG: Dict[str, List[tuple]] = {
     ],
     "llamacpp": [
         ("local-gguf", "Whatever model your llama.cpp / LM Studio server has loaded"),
+    ],
+    "google": [
+        ("gemini-flash-latest", "Fast, current-gen; alias always tracks the latest flash (default)"),
+        ("gemini-flash-lite-latest", "Cheapest/fastest, smaller context"),
+        ("gemini-pro-latest", "Most capable; needs billing enabled (0 free-tier quota)"),
     ],
 }
 
@@ -161,6 +167,8 @@ def api_key(provider: str) -> Optional[str]:
         return os.environ.get("OPENAI_API_KEY") or os.environ.get("CHATGPT_API_KEY")
     if provider == "llamacpp":
         return os.environ.get("LLAMACPP_API_KEY")
+    if provider == "google":
+        return os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     return None
 
 
@@ -198,6 +206,19 @@ def build_openai_payload(model: str, system: str, messages: List[Message],
         payload["reasoning_effort"] = reasoning_effort
     if include_usage and stream:
         payload["stream_options"] = {"include_usage": True}
+    return payload
+
+
+def build_google_payload(model: str, system: str, messages: List[Message],
+                         temperature: float = 0.8, max_tokens: int = 2048) -> Dict:
+    contents = [
+        {"role": "model" if m["role"] == "assistant" else "user", "parts": [{"text": m["content"]}]}
+        for m in messages
+    ]
+    payload: Dict = {"contents": contents,
+                     "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens}}
+    if system:
+        payload["systemInstruction"] = {"parts": [{"text": system}]}
     return payload
 
 
@@ -386,6 +407,31 @@ def stream_anthropic(model: str, system: str, messages: List[Message],
                 yield _usage(output_tokens=usage.get("output_tokens"))
 
 
+def stream_google(model: str, system: str, messages: List[Message],
+                  temperature: float = 0.8, api_key: Optional[str] = None,
+                  max_tokens: int = 2048) -> Iterator[Event]:
+    key = api_key or api_key_for("google")
+    if not key:
+        raise MentorRuntimeError("GEMINI_API_KEY is not set (put it in the env or a .env file)")
+    url = f"{GOOGLE_BASE.rstrip('/')}/v1beta/models/{model}:streamGenerateContent?alt=sse"
+    payload = build_google_payload(model, system, messages, temperature, max_tokens)
+    headers = {"x-goog-api-key": key}
+    with _post(url, payload, headers) as response:
+        for data in _iter_sse_data(response):
+            try:
+                obj = json.loads(data)
+            except json.JSONDecodeError:
+                continue
+            for candidate in obj.get("candidates", []):
+                for part in candidate.get("content", {}).get("parts", []):
+                    if part.get("text"):
+                        yield _text(part["text"])
+            usage = obj.get("usageMetadata")
+            if usage:
+                yield _usage(input_tokens=usage.get("promptTokenCount"),
+                             output_tokens=usage.get("candidatesTokenCount"))
+
+
 # Late-bound key lookup so tests can monkeypatch without import cycles.
 def api_key_for(provider: str) -> Optional[str]:
     return api_key(provider)
@@ -402,9 +448,11 @@ def stream(provider: str, model: str, system: str, messages: List[Message],
         return stream_anthropic(model, system, messages, **kwargs)
     if provider == "llamacpp":
         return stream_llamacpp(model, system, messages, **kwargs)
+    if provider == "google":
+        return stream_google(model, system, messages, **kwargs)
     raise MentorRuntimeError(
         f"provider '{provider}' has no runtime backend. Use one of: "
-        "ollama, llamacpp, openai, anthropic."
+        "ollama, llamacpp, openai, anthropic, google."
     )
 
 

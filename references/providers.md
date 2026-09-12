@@ -13,7 +13,7 @@ Run `mentor providers` to see defaults, or `mentor models` for the model catalog
 | `generic` | — | 0.6 | any capable model | cloud notes |
 | `anthropic` | `claude` | 0.7 | `claude-sonnet-5` | Claude notes + XML shaping |
 | `openai` | `chatgpt`, `gpt`, `oai` | 0.7 | `gpt-5.6` | ChatGPT notes + markdown |
-| `google` | `gemini` | 0.8 | `gemini-2.5-pro` | cloud notes |
+| `google` | `gemini` | 0.8 | `gemini-flash-latest` | cloud notes |
 | `ollama` | `local` | 0.4 | `llama3.1:8b` | local notes |
 | `llamacpp` | — | 0.4 | local-gguf | local notes |
 

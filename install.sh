@@ -19,7 +19,6 @@ OPENCODE_SKILLS=${OPENCODE_SKILLS:-$HOME/.config/opencode/skills}
 MARKER="# >>> expert-mentor setup >>>"
 
 say() { printf '%s\n' "$*"; }
-warn() { printf 'warning: %s\n' "$*" >&2; }
 
 say "expert-mentor installer"
 say "  source: $ROOT"
@@ -36,20 +35,11 @@ chmod +x "$ROOT/bin/mentor" "$ROOT/scripts/expert_mentor.py" "$ROOT/scripts/self
 ln -sf "$ROOT/bin/mentor" "$BIN_DIR/mentor"
 say "[1/4] installed launcher: $BIN_DIR/mentor"
 
-# 2. Skill symlinks (opencode auto-loads ~/.claude/skills too)
-link_skill() {
-    local target="$1"
-    mkdir -p "$(dirname "$target")"
-    if [ -e "$target" ] && [ ! -L "$target" ]; then
-        warn "$target exists and is not a symlink; leaving it alone"
-    else
-        ln -sfn "$ROOT" "$target"
-        say "      linked skill: $target"
-    fi
-}
-say "[2/4] linking skill"
-link_skill "$CLAUDE_SKILLS/expert-mentor"
-link_skill "$OPENCODE_SKILLS/expert-mentor"
+# 2. Skill (opencode auto-loads ~/.claude/skills too)
+say "[2/4] installing skill"
+"$PYTHON" "$ROOT/scripts/expert_mentor.py" skill \
+    --dir "$CLAUDE_SKILLS" --dir "$OPENCODE_SKILLS" \
+    | sed 's/^/      /'
 
 # 3. Ensure ~/.local/bin is on PATH
 case ":$PATH:" in

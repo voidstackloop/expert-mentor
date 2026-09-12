@@ -120,6 +120,7 @@ Profiles, transcripts, prompts, and cards live under
 | `mentor cards` / `quiz` | spaced-repetition flashcards |
 | `mentor config` | saved defaults |
 | `mentor doctor` | health check |
+| `mentor skill` | install the Claude Code / opencode skill (pip/pipx installs included) |
 | `mentor interactive` | build a profile by answering prompts |
 
 Full reference: [docs/commands.md](docs/commands.md).

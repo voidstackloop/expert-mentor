@@ -57,9 +57,25 @@ def _resource_dir(*parts: str) -> Path:
     return candidates[0]
 
 
+def _resource_file(name: str) -> Path:
+    """Locate a single bundled file (e.g. SKILL.md) in both repo and installed layouts."""
+    here = Path(__file__).resolve().parent
+    candidates = [
+        here.parent / name,                        # <repo>/SKILL.md
+        here / name,                                # packaged next to module
+        Path(sys.prefix) / "share" / APP_NAME / name,
+        Path(sys.prefix) / "local" / "share" / APP_NAME / name,
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return candidates[0]
+
+
 ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = _resource_dir("templates")
 REFERENCES_DIR = _resource_dir("references")
+SKILL_MD = _resource_file("SKILL.md")
 
 CONFIG_DIR = Path(os.environ.get("EXPERT_MENTOR_HOME", str(Path.home() / ".config" / "expert-mentor")))
 PROMPTS_DIR = CONFIG_DIR / "prompts"
@@ -716,7 +732,7 @@ def run_doctor() -> int:
 
     linked = next((p for p in SKILL_LINK_DIRS if p.exists()), None)
     line("ok" if linked else "warn",
-         f"skill linked: {linked}" if linked else "skill not linked yet — run ./install.sh")
+         f"skill linked: {linked}" if linked else "skill not installed yet — run 'mentor skill'")
 
     try:
         CONFIG_DIR.mkdir(parents=True, exist_ok=True)
@@ -840,6 +856,57 @@ def run_ollama_command(rest: List[str]) -> int:
         print(f"\nollama create failed (exit {result.returncode}); Modelfile kept at {path}")
         return result.returncode
     print(f"\nollama is not installed. Install it, then run:\n  ollama create {slug} -f {path}")
+    return 0
+
+
+def run_skill_command(rest: List[str]) -> int:
+    parser = argparse.ArgumentParser(prog="mentor skill", add_help=True,
+                                     description="Install the Claude Code / opencode agent skill "
+                                                 "(works for pip/pipx installs, not just git checkouts).")
+    parser.add_argument("--dir", action="append", metavar="PATH",
+                        help="install into PATH/expert-mentor instead of the default locations "
+                             "(repeatable)")
+    parser.add_argument("--force", action="store_true",
+                        help="overwrite an existing skill directory that isn't already ours")
+    opts = parser.parse_args(rest)
+
+    if not SKILL_MD.exists():
+        print(f"SKILL.md not found (looked near {SKILL_MD}); nothing to install", file=sys.stderr)
+        return 1
+
+    # Git checkout: symlink the whole repo, same as install.sh (stays live as the repo changes).
+    # Installed package (pip/pipx): no repo to point at, so copy the bundled files instead.
+    is_checkout = (ROOT / "install.sh").exists()
+    targets = ([Path(d).expanduser() / "expert-mentor" for d in opts.dir] if opts.dir
+               else list(SKILL_LINK_DIRS[:2]))
+
+    installed = 0
+    for target in targets:
+        already_ours = target.is_symlink() or (target / "SKILL.md").exists()
+        if target.exists() or target.is_symlink():
+            if not already_ours and not opts.force:
+                print(f"skip {target} (exists; pass --force to overwrite)", file=sys.stderr)
+                continue
+            if target.is_symlink() or target.is_file():
+                target.unlink()
+            elif target.is_dir():
+                shutil.rmtree(target)
+
+        if is_checkout:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.symlink_to(ROOT, target_is_directory=True)
+        else:
+            target.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(SKILL_MD, target / "SKILL.md")
+            for name, resolved in (("templates", TEMPLATES_DIR), ("references", REFERENCES_DIR)):
+                if resolved.exists():
+                    shutil.copytree(resolved, target / name, dirs_exist_ok=True)
+        print(f"installed skill: {target}")
+        installed += 1
+
+    if not installed:
+        return 1
+    print("\nRestart Claude Code / opencode (or start a new session) to pick it up.")
     return 0
 
 
@@ -1085,7 +1152,7 @@ def run_review_command(rest: List[str]) -> int:
     field_name = (learner.field if learner else "") or meta.get("field", "")
 
     provider = canonical_provider(opts.provider or meta.get("provider") or "ollama")
-    if provider not in ("ollama", "llamacpp", "openai", "anthropic"):
+    if provider not in ("ollama", "llamacpp", "openai", "anthropic", "google"):
         print(f"provider '{provider}' has no runtime backend; pass --provider", file=sys.stderr)
         return 2
     model = opts.model or meta.get("model") or mentor_runtime.DEFAULT_MODELS.get(provider, "")
@@ -1232,7 +1299,7 @@ def _generate_cards(opts: argparse.Namespace, store: "mentor_cards.CardStore") -
     field_name = (learner.field if learner else "") or meta.get("field", "")
 
     provider = canonical_provider(opts.provider or meta.get("provider") or "ollama")
-    if provider not in ("ollama", "llamacpp", "openai", "anthropic"):
+    if provider not in ("ollama", "llamacpp", "openai", "anthropic", "google"):
         print(f"provider '{provider}' has no runtime backend; pass --provider", file=sys.stderr)
         return 2
     model = opts.model or meta.get("model") or mentor_runtime.DEFAULT_MODELS.get(provider, "")
@@ -1411,7 +1478,7 @@ def run_run_command(rest: List[str]) -> int:
         provider = args.provider
         label = args._profile.key
 
-    runtime_providers = {"ollama", "llamacpp", "openai", "anthropic"}
+    runtime_providers = {"ollama", "llamacpp", "openai", "anthropic", "google"}
     if provider not in runtime_providers:
         print(
             f"provider '{provider}' cannot run a live session.\n"
@@ -1463,6 +1530,9 @@ def run_run_command(rest: List[str]) -> int:
             payload = mentor_runtime.build_openai_payload(
                 model, system_prompt, sample_messages, temperature, stream=True,
                 max_tokens=args.max_tokens)
+        elif provider == "google":
+            payload = mentor_runtime.build_google_payload(
+                model, system_prompt, sample_messages, temperature, max_tokens=args.max_tokens)
         else:
             payload = mentor_runtime.build_ollama_payload(
                 model, system_prompt, sample_messages, temperature, max_tokens=args.max_tokens)
@@ -1554,7 +1624,7 @@ def run_run_command(rest: List[str]) -> int:
 COMMANDS = ("version", "fields", "providers", "doctor", "interactive", "prompt",
             "save", "show", "saved", "ollama", "curriculum", "run", "models",
             "learners", "progress", "sessions", "transcript", "review", "config",
-            "cards", "quiz")
+            "cards", "quiz", "skill")
 
 
 # --------------------------------------------------------------------------- #
@@ -1678,6 +1748,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return run_saved_command(rest)
         elif command == "ollama":
             return run_ollama_command(rest)
+        elif command == "skill":
+            return run_skill_command(rest)
         elif command == "models":
             return run_models_command(rest)
         elif command == "learners":

@@ -47,6 +47,7 @@ py-modules = ["expert_mentor", "mentor_runtime", "mentor_memory", "mentor_cards"
 version = { attr = "expert_mentor.__version__" }
 
 [tool.setuptools.data-files]
+"share/expert-mentor" = ["SKILL.md"]
 "share/expert-mentor/templates" = ["templates/*.md"]
 "share/expert-mentor/references" = ["references/*.md", "references/*.json"]
 

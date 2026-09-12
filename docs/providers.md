@@ -8,7 +8,7 @@
 | `generic` | — | any capable model | prompt text only |
 | `anthropic` | `claude` | `claude-sonnet-5` | live sessions + JSON |
 | `openai` | `chatgpt`, `gpt`, `oai` | `gpt-5.6` | live sessions + JSON |
-| `google` | `gemini` | `gemini-2.5-pro` | prompt JSON |
+| `google` | `gemini` | `gemini-flash-latest` | live sessions + JSON |
 | `ollama` | `local` | `llama3.1:8b` | live sessions + Modelfile |
 | `llamacpp` | — | your loaded GGUF | live sessions |
 
@@ -24,11 +24,12 @@ directory or `~/.config/expert-mentor/.env` (existing env vars win):
 |----------|-----------|
 | Anthropic | `ANTHROPIC_API_KEY` (or `CLAUDE_API_KEY`) |
 | OpenAI | `OPENAI_API_KEY` (or `CHATGPT_API_KEY`) |
+| Google (Gemini) | `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) |
 | llama.cpp / LM Studio | `LLAMACPP_API_KEY` (optional) |
 | Ollama | none |
 
-Endpoint overrides: `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `OLLAMA_HOST`,
-`LLAMACPP_HOST`.
+Endpoint overrides: `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `GOOGLE_BASE_URL`,
+`OLLAMA_HOST`, `LLAMACPP_HOST`.
 
 ## Claude (Anthropic)
 
@@ -66,10 +67,18 @@ mentor run --field "Rust" --provider chatgpt --model gpt-5.6 --reasoning-effort 
 
 ## Gemini (Google)
 
-`--emit json` produces a `systemInstruction` + `contents` payload. Live sessions
-are not currently implemented for Gemini.
+`--emit json` produces a `systemInstruction` + `contents` payload for the
+Gemini API. Live sessions are supported: requests go to
+`v1beta/models/{model}:streamGenerateContent`, authenticated with the
+`x-goog-api-key` header, and stream back `text` and usage events.
+
+Google's model names churn fast and older dated snapshots get retired; prefer
+the rolling aliases (`gemini-flash-latest`, `gemini-flash-lite-latest`,
+`gemini-pro-latest`) over a pinned version. Note the free tier currently grants
+`gemini-pro-latest` zero quota — use a flash model unless billing is enabled.
 
 ```bash
+mentor run --field "Rust" --provider gemini --model gemini-flash-latest
 mentor --field "macroeconomics" --provider gemini --emit json
 ```
 

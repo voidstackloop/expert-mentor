@@ -126,6 +126,7 @@ mentor config --set provider=claude --set level=intermediate --set style=coachin
 mentor config --unset style
 mentor config --reset
 mentor doctor
+mentor skill [--dir PATH] [--force]    # install the Claude Code / opencode skill
 mentor version
 mentor interactive
 ```
