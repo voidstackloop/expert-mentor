@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    name: test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.8", "3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run self-test suite
+        run: python scripts/selftest.py
+
+      - name: Health check
+        run: python scripts/expert_mentor.py doctor
+
+      - name: Generate a sample prompt
+        run: python scripts/expert_mentor.py --field "quantum computing" --level beginner > /dev/null
+
+  package:
+    name: build & install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install the package
+        run: pip install .
+      - name: Verify console entry point
+        run: mentor version
+      - name: Verify bundled resources resolve after install
+        run: mentor fields

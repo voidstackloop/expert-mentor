@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "expert-mentor"
+description = "Turn any LLM (Claude, ChatGPT, Gemini, Ollama, llama.cpp) into a professional teacher for any field."
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "expert-mentor contributors" }]
+keywords = ["llm", "mentor", "tutor", "education", "claude", "chatgpt", "ollama", "prompt"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Education",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Education",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://pypi.org/project/expert-mentor/"
+# Uncomment and set once the GitHub repo exists:
+# Repository = "https://github.com/<owner>/expert-mentor"
+
+[project.scripts]
+mentor = "expert_mentor:cli"
+expert-mentor = "expert_mentor:cli"
+
+[tool.setuptools]
+package-dir = { "" = "scripts" }
+py-modules = ["expert_mentor", "mentor_runtime", "mentor_memory"]
+
+[tool.setuptools.dynamic]
+version = { attr = "expert_mentor.__version__" }
+
+[tool.setuptools.data-files]
+"share/expert-mentor/templates" = ["templates/*.md"]
+"share/expert-mentor/references" = ["references/*.md", "references/*.json"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py38"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]

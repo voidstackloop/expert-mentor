@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+# expert-mentor launcher. Works when run in place or symlinked into ~/.local/bin.
+set -eu
+
+SELF=$0
+# Resolve symlinks so the launcher can live anywhere on PATH.
+if command -v readlink >/dev/null 2>&1 && readlink -f "$SELF" >/dev/null 2>&1; then
+    SELF=$(readlink -f "$SELF")
+else
+    while [ -h "$SELF" ]; do
+        DIR=$(cd -P "$(dirname "$SELF")" >/dev/null 2>&1 && pwd)
+        SELF=$(readlink "$SELF")
+        case "$SELF" in
+            /*) ;;
+            *) SELF="$DIR/$SELF" ;;
+        esac
+    done
+fi
+
+ROOT=$(cd -P "$(dirname "$SELF")/.." >/dev/null 2>&1 && pwd)
+PYTHON=${PYTHON:-python3}
+
+if ! command -v "$PYTHON" >/dev/null 2>&1; then
+    echo "expert-mentor: python3 not found (set PYTHON=/path/to/python3)" >&2
+    exit 127
+fi
+
+exec "$PYTHON" "$ROOT/scripts/expert_mentor.py" "$@"
