@@ -128,6 +128,8 @@ Commands:
 | `mentor learners` | list persisted learner profiles |
 | `mentor progress NAME [...]` | view/update a learner's mastered/shaky/misconception lists |
 | `mentor review NAME [--apply]` | assess the latest transcript and update the learner profile |
+| `mentor cards NAME [--add "Q :: A"] [--generate]` | manage spaced-repetition flashcards |
+| `mentor quiz NAME [--all] [--n N]` | review due flashcards (again/hard/good/easy) |
 | `mentor sessions [NAME]` | list recorded sessions |
 | `mentor transcript ID` | print a session transcript |
 | `mentor fields` | list curated field profiles |
@@ -235,6 +237,20 @@ next lesson), and merges it — promoting anything newly mastered out of *shaky*
 This closes the loop: run → transcript → assessment → updated profile, with no
 manual bookkeeping.
 
+**Spaced repetition.** Turn a session into flashcards and review them over time:
+
+```bash
+mentor cards rust --generate                   # build cards from the latest session
+mentor cards rust --add "What is ownership? :: Each value has one owner."
+mentor cards rust                              # list, with due counts
+mentor quiz rust                               # review what is due (again/hard/good/easy)
+mentor quiz rust --all --n 20                  # review ahead
+```
+
+Cards use an SM-2-lite scheduler (interval, ease, reps) stored in
+`~/.config/expert-mentor/learners/<name>.cards.json`, so review scheduling
+carries across sessions and machines.
+
 ## Step 4 — Run the session (or hand off the prompt)
 
 If teaching inline, obey the loaded prompt's **Teaching Contract** without
@@ -261,9 +277,11 @@ the temperature (the script prints a recommended value).
 - `templates/compact_prompt.md` — short variant for small local models.
 - `templates/curriculum_prompt.md` — curriculum-designer prompt.
 - `templates/review_prompt.md` — session-assessment (progress review) prompt.
+- `templates/cards_prompt.md` — flashcard-generation prompt.
 - `scripts/expert_mentor.py` — the CLI: provider-aware prompt/Modelfile/JSON generator.
 - `scripts/mentor_runtime.py` — dependency-free streaming chat adapters (Ollama, llama.cpp, OpenAI, Anthropic).
 - `scripts/mentor_memory.py` — persistent learner profiles and session transcripts.
+- `scripts/mentor_cards.py` — spaced-repetition flashcards (SM-2-lite scheduler).
 - `scripts/selftest.py` — dependency-free test suite (`make test`).
 - `references/pedagogy.md` — the teaching methods the mentor draws on.
 - `references/fields.md` — curated field profiles + how to add your own.

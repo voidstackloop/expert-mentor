@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -30,13 +31,15 @@ from typing import Dict, List, Optional
 try:
     import mentor_runtime
     import mentor_memory
+    import mentor_cards
 except ImportError:  # when imported without scripts/ on sys.path
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import mentor_runtime
     import mentor_memory
+    import mentor_cards
 
 APP_NAME = "expert-mentor"
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 
 def _resource_dir(*parts: str) -> Path:
@@ -629,6 +632,10 @@ def get_memory() -> "mentor_memory.Memory":
     return mentor_memory.Memory(CONFIG_DIR)
 
 
+def get_card_store() -> "mentor_cards.CardStore":
+    return mentor_cards.CardStore(CONFIG_DIR)
+
+
 def shape_prompt(text: str, provider: str, mode: str = "auto") -> str:
     """Adapt the prompt to the target model's preferred structure.
 
@@ -1132,6 +1139,197 @@ def run_review_command(rest: List[str]) -> int:
     return 0
 
 
+def _cards_system_prompt(field_name: str, provider: str) -> str:
+    path = TEMPLATES_DIR / "cards_prompt.md"
+    text = extract_prompt(path.read_text(encoding="utf-8"))
+    profile = resolve_profile(field_name, load_profiles()) if field_name else None
+    values = {
+        "MENTOR_NAME": (profile.mentor_name if profile and profile.mentor_name
+                        else (generate_mentor_name(field_name) if field_name else "the teacher")),
+        "FIELD": field_name or "the subject",
+        "CAPABILITY_NOTES": PROVIDERS[provider].capability_notes,
+    }
+    return render(text, values)
+
+
+def run_cards_command(rest: List[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="mentor cards", add_help=True,
+        description="Manage spaced-repetition flashcards for a learner.")
+    parser.add_argument("learner")
+    parser.add_argument("--add", metavar="FRONT :: BACK", help="add a card manually")
+    parser.add_argument("--tags", default="", help="comma-separated tags for --add")
+    parser.add_argument("--generate", action="store_true", help="build cards from the latest session")
+    parser.add_argument("--session", help="specific session id for --generate")
+    parser.add_argument("--remove", metavar="ID", help="remove a card by id")
+    parser.add_argument("--reset", action="store_true", help="delete all cards for the learner")
+    parser.add_argument("--provider", choices=PROVIDER_CHOICES)
+    parser.add_argument("--model")
+    parser.add_argument("--host")
+    parser.add_argument("--temperature", type=float)
+    parser.add_argument("--dry-run", action="store_true", help="show the generation prompt, call nothing")
+    opts = parser.parse_args(rest)
+    store = get_card_store()
+
+    if opts.reset:
+        store.save(opts.learner, [])
+        print(f"cleared cards for '{opts.learner}'")
+        return 0
+    if opts.remove:
+        print("removed" if store.remove(opts.learner, opts.remove) else "no such card")
+        return 0
+    if opts.add:
+        if "::" not in opts.add:
+            print('expected: --add "FRONT :: BACK"', file=sys.stderr)
+            return 2
+        front, _, back = opts.add.partition("::")
+        tags = [t.strip() for t in opts.tags.split(",") if t.strip()]
+        card = store.add(opts.learner, front, back, tags)
+        print(f"added card {card.id}: {card.front}")
+        return 0
+    if opts.generate:
+        return _generate_cards(opts, store)
+
+    cards = store.load(opts.learner)
+    stats = store.stats(opts.learner)
+    if not cards:
+        print(f"no cards for '{opts.learner}' yet. Try:")
+        print(f'  mentor cards {opts.learner} --add "What is ownership? :: ..."')
+        print(f"  mentor cards {opts.learner} --generate")
+        return 0
+    print(f"{opts.learner}: {stats['total']} cards · {stats['due']} due · {stats['learned']} learned"
+          f" · {stats['lapses']} lapses\n")
+    for card in cards:
+        mark = "*" if card.is_due() else " "
+        done = f"due {card.due[:10]}"
+        print(f"  [{mark}] {card.id}  {card.front}  (reps={card.reps}, {done})")
+    print("\n* = due now. Review with: mentor quiz " + opts.learner)
+    return 0
+
+
+def _generate_cards(opts: argparse.Namespace, store: "mentor_cards.CardStore") -> int:
+    memory = get_memory()
+    if opts.session:
+        path = memory.transcript_path(opts.session)
+    else:
+        sessions = memory.list_sessions(opts.learner)
+        if not sessions:
+            print(f"no sessions recorded for '{opts.learner}' — run a session first", file=sys.stderr)
+            return 1
+        path = memory.transcript_path(sessions[-1]["id"])
+    if path is None:
+        print("could not find a transcript to generate from", file=sys.stderr)
+        return 1
+
+    meta: Dict = {}
+    meta_path = path.with_suffix(".json")
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            meta = {}
+    learner = memory.load(opts.learner)
+    field_name = (learner.field if learner else "") or meta.get("field", "")
+
+    provider = canonical_provider(opts.provider or meta.get("provider") or "ollama")
+    if provider not in ("ollama", "llamacpp", "openai", "anthropic"):
+        print(f"provider '{provider}' has no runtime backend; pass --provider", file=sys.stderr)
+        return 2
+    model = opts.model or meta.get("model") or mentor_runtime.DEFAULT_MODELS.get(provider, "")
+    temperature = opts.temperature if opts.temperature is not None else 0.3
+    system = _cards_system_prompt(field_name, provider)
+    transcript = path.read_text(encoding="utf-8")
+
+    if opts.dry_run:
+        print("=== system ===")
+        print(system)
+        print("\n=== user (transcript) ===")
+        print(transcript)
+        return 0
+
+    kwargs: Dict = {}
+    if provider in ("ollama", "llamacpp") and opts.host:
+        kwargs["host"] = opts.host
+    try:
+        raw = mentor_runtime.complete(provider, model, system,
+                                      [{"role": "user", "content": transcript}],
+                                      temperature=temperature, **kwargs)
+    except mentor_runtime.MentorRuntimeError as exc:
+        print(f"[error] {exc}", file=sys.stderr)
+        return 1
+
+    data = mentor_memory.extract_json(raw)
+    if not data or not isinstance(data.get("cards"), list):
+        print("could not parse flashcards from the model output. Raw output:\n")
+        print(raw)
+        return 1
+
+    added = 0
+    for item in data["cards"]:
+        if not isinstance(item, dict):
+            continue
+        front = str(item.get("front", "")).strip()
+        back = str(item.get("back", "")).strip()
+        if front and back:
+            store.add(opts.learner, front, back, item.get("tags") or [])
+            added += 1
+    print(f"generated {added} card(s) for '{opts.learner}' (from {path.name})")
+    print(f"review with: mentor quiz {opts.learner}")
+    return 0
+
+
+def run_quiz_command(rest: List[str]) -> int:
+    parser = argparse.ArgumentParser(
+        prog="mentor quiz", add_help=True,
+        description="Review due flashcards with spaced repetition.")
+    parser.add_argument("learner")
+    parser.add_argument("--n", type=int, default=10, help="maximum cards this session (default: 10)")
+    parser.add_argument("--all", action="store_true", help="include cards that are not due yet")
+    parser.add_argument("--shuffle", action="store_true", help="randomise the order")
+    opts = parser.parse_args(rest)
+
+    store = get_card_store()
+    cards = store.load(opts.learner)
+    queue = cards if opts.all else [c for c in cards if c.is_due()]
+    if opts.shuffle:
+        random.shuffle(queue)
+    queue = queue[:max(0, opts.n)]
+
+    if not queue:
+        stats = store.stats(opts.learner)
+        if stats["total"] == 0:
+            print(f"no cards for '{opts.learner}'. Create some with 'mentor cards {opts.learner} --generate'.")
+        else:
+            print(f"nothing due for '{opts.learner}' ({stats['total']} cards). Use --all to review anyway.")
+        return 0
+
+    print(f"quiz · {opts.learner} · {len(queue)} card(s)\n")
+    reviewed = 0
+    try:
+        for index, card in enumerate(queue, 1):
+            print(f"[{index}/{len(queue)}] {card.front}")
+            try:
+                input("  (Enter to reveal) ")
+            except EOFError:
+                break
+            print(f"  → {card.back}")
+            try:
+                raw = input("  grade [again/hard/good/easy] (Enter=good, q=quit): ").strip().lower()
+            except EOFError:
+                raw = "good"
+            if raw in ("q", "quit", "exit"):
+                break
+            grade = raw if raw in mentor_cards.GRADES else "good"
+            mentor_cards.review(card, grade)
+            reviewed += 1
+            print()
+    except KeyboardInterrupt:
+        print()
+    store.save(opts.learner, cards)
+    print(f"reviewed {reviewed} card(s). Next due dates updated.")
+    return 0
+
+
 def _load_saved_prompt(name: str) -> tuple:
     slug = slugify(name)
     path = PROMPTS_DIR / f"{slug}.md"
@@ -1272,9 +1470,11 @@ def run_run_command(rest: List[str]) -> int:
         return 0
 
     def turn(messages: List[Dict]) -> tuple:
+        limit = max(2, args.history_turns * 2)
+        payload = messages[-limit:] if len(messages) > limit else messages
         chunks: List[str] = []
         usage: Dict = {}
-        for event in mentor_runtime.stream(provider, model, system_prompt, messages,
+        for event in mentor_runtime.stream(provider, model, system_prompt, payload,
                                            temperature=temperature, max_tokens=args.max_tokens,
                                            **kwargs):
             kind = event.get("type")
@@ -1353,7 +1553,8 @@ def run_run_command(rest: List[str]) -> int:
 
 COMMANDS = ("version", "fields", "providers", "doctor", "interactive", "prompt",
             "save", "show", "saved", "ollama", "curriculum", "run", "models",
-            "learners", "progress", "sessions", "transcript", "review", "config")
+            "learners", "progress", "sessions", "transcript", "review", "config",
+            "cards", "quiz")
 
 
 # --------------------------------------------------------------------------- #
@@ -1373,7 +1574,8 @@ def build_parser() -> argparse.ArgumentParser:
                "  mentor run --field 'Rust' --provider chatgpt --remember\n"
                "  mentor curriculum --field 'Rust' --duration '6 weeks'\n"
                "  mentor models --provider claude --refresh\n"
-               "  mentor learners | progress <name> | sessions | review <name>\n"
+               "  mentor learners | progress <name> | review <name> | quiz <name>\n"
+               "  mentor cards <name> [--add \"Q :: A\"] [--generate]\n"
                "  mentor config | fields | providers | saved | doctor | interactive | version\n",
     )
     p.add_argument("--version", action="version", version=f"{APP_NAME} {__version__}")
@@ -1423,6 +1625,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Anthropic: do not mark the system prompt for prompt caching")
     p.add_argument("--show-thinking", action="store_true",
                    help="'run': show model reasoning/thinking as it streams (dimmed, stderr)")
+    p.add_argument("--history-turns", type=int, default=40,
+                   help="'run': max past turns kept in context (default: 40)")
     # persistent learner
     p.add_argument("--learner", default=cfg.get("learner"),
                    help="'run'/'prompt': load and update a named learner profile")
@@ -1486,6 +1690,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             return run_transcript_command(rest)
         elif command == "review":
             return run_review_command(rest)
+        elif command == "cards":
+            return run_cards_command(rest)
+        elif command == "quiz":
+            return run_quiz_command(rest)
         elif command == "config":
             return run_config_command(rest)
         elif command == "curriculum":

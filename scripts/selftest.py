@@ -289,6 +289,44 @@ def main() -> int:
         finally:
             em.CONFIG_DIR = old_config
 
+    print("\ncards & spaced repetition:")
+    import mentor_cards as mc
+    old_config = em.CONFIG_DIR
+    with tempfile.TemporaryDirectory() as tmp:
+        em.CONFIG_DIR = Path(tmp)
+        try:
+            store = em.get_card_store()
+            card = store.add("rusty", "What is ownership?", "Each value has one owner.")
+            check("card added", bool(card.id) and store.stats("rusty")["total"] == 1)
+            check("new card is due", store.stats("rusty")["due"] == 1)
+            mc.review(card, "good")
+            check("good sets interval", card.reps == 1 and card.interval == 1.0)
+            check("card no longer due", not card.is_due())
+            mc.review(card, "again")
+            check("again resets reps + lapse", card.reps == 0 and card.lapses == 1)
+            check("again relearns soon", card.interval == 0.0)
+            store.save("rusty", [card])
+            check("card store roundtrip", len(store.load("rusty")) == 1)
+            with _rso(io.StringIO()):
+                code = em.main(["cards", "rusty", "--add", "What is a borrow? :: A reference."])
+            check("cards --add", code == 0)
+            buf = io.StringIO()
+            with _rso(buf):
+                em.main(["cards", "rusty"])
+            check("cards list", "What is a borrow?" in buf.getvalue())
+            old_stdin = sys.stdin
+            sys.stdin = io.StringIO("\ngood\n")
+            try:
+                with _rso(io.StringIO()):
+                    code = em.main(["quiz", "rusty", "--all", "--n", "1"])
+                check("quiz runs", code == 0)
+            finally:
+                sys.stdin = old_stdin
+            check("remove missing card is a no-op", store.remove("rusty", "zzzzz") is False)
+            check("replace updates back", store.add("rusty", "What is a borrow?", "An alias.").back == "An alias.")
+        finally:
+            em.CONFIG_DIR = old_config
+
     print(f"\n{PASS} passed, {FAIL} failed")
     return 1 if FAIL else 0
 
