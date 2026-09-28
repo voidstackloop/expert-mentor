@@ -6,6 +6,19 @@
 level, runs the tutoring session directly, remembers what you've mastered across
 sessions, and reviews your progress from the transcript.
 
+![Generating a Rust mentor prompt](docs/images/terminal-prompt-rust.png)
+
+<details>
+<summary>More screenshots and diagrams</summary>
+
+![How a field becomes a mentor session](docs/images/diagram-flow.svg)
+![Curated field profiles](docs/images/terminal-fields.png)
+![Supported providers](docs/images/terminal-providers.png)
+![mentor doctor](docs/images/terminal-doctor.png)
+
+More in [docs/diagrams.md](docs/diagrams.md).
+</details>
+
 [![CI](https://github.com/voidstackloop/expert-mentor/actions/workflows/ci.yml/badge.svg)](https://github.com/voidstackloop/expert-mentor/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/expert-mentor.svg)](https://pypi.org/project/expert-mentor/)
 [![Python versions](https://img.shields.io/pypi/pyversions/expert-mentor.svg)](https://pypi.org/project/expert-mentor/)
