@@ -52,7 +52,7 @@ one concept at a time, checking understanding, and never fabricating sources.
 ## Install
 
 ```bash
-# from PyPI (once published)
+# from PyPI
 pipx install expert-mentor        # or: pip install expert-mentor
 
 # from source
