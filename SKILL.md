@@ -1,6 +1,12 @@
 ---
 name: expert-mentor
 description: "Use when the user wants to learn, be taught, or be mentored in any field (e.g. 'teach me quantum computing', 'be my Rust mentor', 'explain macroeconomics like a professor'), or wants to turn a cloud AI provider (Claude/Anthropic, ChatGPT/OpenAI, Gemini) or local LLM (Ollama, LM Studio, llama.cpp) into a professional teacher for a given field. Produces a calibrated expert-mentor persona, a learning roadmap, a live tutoring session, or a full curriculum."
+summary: "Turn Claude, ChatGPT, Gemini or a local LLM into a professional tutor that remembers your progress and quizzes you."
+version: 0.6.1
+tags: ["education", "tutoring", "mentoring", "prompt-engineering", "curriculum", "flashcards"]
+keywords: ["tutor", "mentor", "teacher", "coaching", "claude", "chatgpt", "gemini", "ollama", "curriculum", "flashcards", "study-plan"]
+use_cases: ["teach me quantum computing", "be my Rust mentor", "explain macroeconomics like a professor", "turn Claude into an expert tutor", "build a study curriculum for a field"]
+docs_url: https://github.com/voidstackloop/expert-mentor
 ---
 
 # Expert Mentor
@@ -10,27 +16,26 @@ LLM (Ollama, LM Studio, llama.cpp) — into a **professional teacher for a
 user-specified field**. The mentor teaches to a standard a real senior
 practitioner would recognise, and adapts to the learner in real time.
 
-## Setup (one command)
+## Setup (optional)
+
+This skill folder works as-is — no install needed. Run it in place:
 
 ```bash
-cd ~/projects/expert-mentor
+python3 scripts/expert_mentor.py --field "Rust" --level beginner
+```
+
+Want a `mentor` command on your PATH instead of typing the full script path?
+Run the installer once from inside this folder:
+
+```bash
 ./install.sh          # or: make install
 ```
 
 This installs the `mentor` command into `~/.local/bin`, links the skill into
 `~/.claude/skills/expert-mentor` and `~/.config/opencode/skills/expert-mentor`,
 adds `~/.local/bin` to PATH if needed, and runs a health check. Open a new
-terminal (or `source ~/.bashrc`) and run `mentor doctor`.
-
-No install needed? Run it in place with `./bin/mentor ...` or
-`python3 scripts/expert_mentor.py ...`. Remove everything with `./uninstall.sh`.
-
-Prefer an isolated, pip-managed install instead:
-
-```bash
-pipx install .        # or: pip install --user .
-mentor version
-```
+terminal (or `source ~/.bashrc`) and run `mentor doctor`. Remove it later with
+`./uninstall.sh`.
 
 Defaults can be saved so you stop retyping them:
 

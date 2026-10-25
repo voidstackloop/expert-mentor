@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: help install uninstall test demo curriculum fields providers doctor dist clean
+.PHONY: help install uninstall test demo curriculum fields providers doctor dist skill-zip bundles clean
 
 help:
 	@echo "expert-mentor"
@@ -14,6 +14,8 @@ help:
 	@echo "  make demo         generate a sample prompt to stdout"
 	@echo "  make curriculum   generate a sample curriculum prompt to stdout"
 	@echo "  make dist         build sdist + wheel into dist/ (needs 'build')"
+	@echo "  make skill-zip    package SKILL.md + supporting files for marketplace submission"
+	@echo "  make bundles      build all provider bundles into bundles/"
 	@echo "  make clean        remove __pycache__ and build artifacts"
 
 install:
@@ -46,6 +48,12 @@ dist:
 	@$(PYTHON) -m pip install --quiet --upgrade build
 	@$(PYTHON) -m build
 	@echo "artifacts in dist/ — publish with: python -m twine upload dist/*"
+
+skill-zip:
+	@$(PYTHON) scripts/build_skill_zip.py
+
+bundles:
+	@$(PYTHON) scripts/build_bundles.py
 
 clean:
 	@rm -rf scripts/__pycache__ build dist *.egg-info scripts/*.egg-info
