@@ -80,7 +80,8 @@ if [ "$PATH_OK" -eq 0 ]; then
     say "or open a new terminal."
     say ""
 fi
-say "Try it:"
+say "Try it (no API key needed):"
+say "  mentor run --field 'Rust' --provider agent --remember"
 say "  mentor --field 'quantum computing' --level beginner"
 say "  mentor save rustbuddy --field 'Rust' --level intermediate"
 say "  mentor ollama rusttutor --field 'Rust' --compact"

@@ -40,7 +40,8 @@ Full notes: [`references/pedagogy.md`](../references/pedagogy.md).
 Phase 1  Intake     — a few questions to find the real starting point
 Phase 2  Roadmap    — a short, agreed sequence of milestones
 Phase 3  Teach loop — activate → explain + example → check → exercise → feedback
-Phase 4  Consolidate— learner summarises, gets one piece of independent practice
+Phase 4  Consolidate— corrected self-summary, 3 banked retrieval questions,
+                       misconception watchlist, one piece of independent practice
 ```
 
 ## The learner model
@@ -68,9 +69,11 @@ re-teaching what you know and deliberately revisits what is weak.
 ## Progress review
 
 `mentor review` asks the model to assess the latest transcript and return strict
-JSON: mastered / shaky / misconceptions / open questions / level / next lesson.
-It merges the result into the profile, promoting anything newly mastered out of
-*shaky*. Nothing is invented — items require evidence from the transcript.
+JSON: mastered / shaky / misconceptions / open questions / level / next lesson
+/ retrieval questions. It merges the result into the profile, promoting anything
+newly mastered out of *shaky*, and prints the banked retrieval questions the
+next session opens with. Nothing is invented — items require evidence from the
+transcript.
 
 ```bash
 mentor review rust            # show proposed changes
@@ -80,7 +83,9 @@ mentor review rust --dry-run  # show the review prompt, call nothing
 
 ## Spaced repetition
 
-`mentor cards --generate` turns a session into flashcards; `mentor quiz` reviews
+`mentor cards --generate` turns a session into flashcards — including
+discrimination cards built from the learner's revealed misconceptions (wrong
+belief → why it fails → correct model + evidence); `mentor quiz` reviews
 due cards with an **SM-2-lite** scheduler. Each card tracks an interval (days),
 ease factor, repetition count, and due date. Grades:
 

@@ -55,6 +55,7 @@ DEFAULT_MODELS = {
     "llamacpp": "local-gguf",
     "google": "gemini-flash-latest",
     "generic": "any capable model",
+    "agent": "agent's own model (no API call)",
 }
 
 MODEL_CATALOG: Dict[str, List[tuple]] = {
@@ -87,6 +88,9 @@ MODEL_CATALOG: Dict[str, List[tuple]] = {
         ("gemini-flash-lite-latest", "Cheapest/fastest, smaller context"),
         ("gemini-pro-latest", "Most capable; needs billing enabled (0 free-tier quota)"),
     ],
+    "agent": [
+        ("agent's own model (no API call)", "Host agent teaches inline; no key, no network (default)"),
+    ],
 }
 
 
@@ -118,6 +122,8 @@ def capabilities(provider: str, model: str) -> Capabilities:
         return Capabilities("message", "system", "max_tokens", True, False, False)
     if provider == "google":
         return Capabilities("top_level", "", "max_tokens", True, False, False)
+    if provider == "agent":
+        return Capabilities("message", "system", "max_tokens", True, False, False)
     return Capabilities("message", "system", "max_tokens", True, False, False)
 
 
@@ -450,9 +456,16 @@ def stream(provider: str, model: str, system: str, messages: List[Message],
         return stream_llamacpp(model, system, messages, **kwargs)
     if provider == "google":
         return stream_google(model, system, messages, **kwargs)
+    if provider == "agent":
+        raise MentorRuntimeError(
+            "provider 'agent' has no network backend by design: the host agent itself "
+            "is the model. Use 'mentor run --provider agent' (relay mode, no API key) "
+            "or generate a prompt with 'mentor --provider agent' and paste it into "
+            "your agent app."
+        )
     raise MentorRuntimeError(
         f"provider '{provider}' has no runtime backend. Use one of: "
-        "ollama, llamacpp, openai, anthropic, google."
+        "agent, ollama, llamacpp, openai, anthropic, google."
     )
 
 

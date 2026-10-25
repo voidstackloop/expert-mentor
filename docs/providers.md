@@ -5,6 +5,7 @@
 
 | Provider | Aliases | Default model | Used for |
 |----------|---------|---------------|----------|
+| `agent` | `manual`, `own`, `byom` | agent's own model (no API call) | keyless relay sessions + prompt text |
 | `generic` | — | any capable model | prompt text only |
 | `anthropic` | `claude` | `claude-sonnet-5` | live sessions + JSON |
 | `openai` | `chatgpt`, `gpt`, `oai` | `gpt-5.6` | live sessions + JSON |
@@ -15,10 +16,36 @@
 List what is available with `mentor providers`, and discover live model IDs with
 `mentor models --provider claude --refresh`.
 
+## No API key? Use the agent relay or local models
+
+No key is required to start. Two keyless paths:
+
+1. **Agent relay** — your agent's own app is the model (its subscription, not
+   an API key). Generate a prompt, paste it into your app, and relay the turns
+   so memory, review, and cards keep working:
+
+```bash
+mentor --field "Rust" --provider agent --out prompt.md   # paste prompt.md into your app
+mentor run --field "Rust" --provider agent --remember   # relay turns here; end pastes with /end
+```
+
+2. **Local models** — Ollama or llama.cpp need no keys either:
+
+```bash
+mentor run --field "Rust" --provider ollama --model qwen2.5:7b
+```
+
+`mentor review NAME --provider agent --dry-run` and
+`mentor cards NAME --generate --provider agent --dry-run` print paste-into-your-app
+prompts; apply the result by hand (`mentor progress`, `mentor cards --add`) or
+re-run with a backend (`--provider ollama`, or a cloud key).
+
 ## Credentials
 
 Keys are read from the environment, or from a `.env` file in the working
-directory or `~/.config/expert-mentor/.env` (existing env vars win):
+directory or `~/.config/expert-mentor/.env` (existing env vars win). Key values
+are never printed by any command — `doctor` only reports set/not-set, and
+transcripts and `--dry-run` payloads never contain keys.
 
 | Provider | Variables |
 |----------|-----------|
@@ -29,7 +56,9 @@ directory or `~/.config/expert-mentor/.env` (existing env vars win):
 | Ollama | none |
 
 Endpoint overrides: `ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `GOOGLE_BASE_URL`,
-`OLLAMA_HOST`, `LLAMACPP_HOST`.
+`OLLAMA_HOST`, `LLAMACPP_HOST`. Protect key files: `chmod 600 .env
+~/.config/expert-mentor/.env` — `mentor doctor` warns when they are readable
+by others.
 
 ## Claude (Anthropic)
 

@@ -23,7 +23,8 @@ Return ONLY a single JSON object. No markdown fences, no commentary.
   "shaky": ["concepts the learner attempted but got wrong or needed heavy help with"],
   "misconceptions": ["specific wrong mental models the learner revealed"],
   "open_questions": ["questions raised but not resolved"],
-  "next_lesson": "one concrete thing to teach next session"
+  "next_lesson": "one concrete thing to teach next session",
+  "retrieval_questions": ["3 questions for next session, easiest first, each answerable from this session's material"]
 }
 
 # RULES
@@ -33,6 +34,8 @@ Return ONLY a single JSON object. No markdown fences, no commentary.
 - `shaky` is for concepts with real friction — not mere exposure.
 - Be specific and use the field's real terminology.
 - List 0-6 items per list; use `[]` when there is nothing.
+- `retrieval_questions` must be answerable from this session alone (no new
+  material) and ordered easiest first, so the next session can open with them.
 - If the transcript is empty or has no learning content, return empty lists and
   say so in `summary`.
 - Output valid JSON and nothing else.

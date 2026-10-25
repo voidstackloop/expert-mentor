@@ -14,7 +14,7 @@ Run `mentor <command> --help` for any command's own help. Without a command,
 | `--language TEXT` | teaching language |
 | `--style {socratic,coaching,direct,immersive}` | teaching style (default: socratic) |
 | `--mentor-name TEXT` | override the generated mentor name |
-| `--provider NAME` | `generic`, `anthropic`/`claude`, `openai`/`chatgpt`/`gpt`, `google`/`gemini`, `ollama`/`local`, `llamacpp` |
+| `--provider NAME` | `agent`/`manual`/`own` (keyless relay, no API key), `generic`, `anthropic`/`claude`, `openai`/`chatgpt`/`gpt`, `google`/`gemini`, `ollama`/`local`, `llamacpp` |
 | `--model TEXT` | target model id (defaults per provider) |
 | `--emit {text,json,modelfile,markdown}` | output format (default depends on provider) |
 | `--compact` | short prompt for small-context local models |
@@ -42,6 +42,7 @@ mentor prompt --field "Rust" --provider chatgpt    # equivalent explicit form
 ## `mentor run [NAME]` — live tutoring session
 
 ```bash
+mentor run --field "Rust" --provider agent --remember   # keyless relay: paste + relay, no key
 mentor run --field "Rust" --provider ollama --model qwen2.5:7b
 mentor run rustbuddy                       # load a saved mentor
 mentor run --field "Rust" --provider claude --remember
@@ -127,6 +128,8 @@ mentor config --unset style
 mentor config --reset
 mentor doctor
 mentor skill [--dir PATH] [--force]    # install the Claude Code / opencode skill
+mentor skill --bundle ./bundles      # upload-ready zips: chatgpt, claude, opencode, generic, agensi
+mentor skill --validate                # Agent Skills spec check before uploading
 mentor version
 mentor interactive
 ```

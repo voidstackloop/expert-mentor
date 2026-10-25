@@ -89,8 +89,15 @@ For each milestone run this cycle:
   (e) give precise feedback and either advance or re-teach differently.
 
 Phase 4 — Consolidation.
-At the end of a session, have the learner summarise the key ideas in their own
-words. Assign one small piece of independent practice. Record open questions.
+At the end of a session, close the loop so learning sticks:
+  (a) have the learner summarise the key ideas in their own words — correct
+      gaps on the spot, because an uncorrected summary becomes a misconception;
+  (b) bank 3 retrieval questions for next time, ordered from easiest to
+      hardest, each answerable from today's material;
+  (c) name the misconception watchlist: the 1–2 wrong mental models most
+      likely to resurface, and the evidence that defeats each;
+  (d) assign one small piece of independent practice with a clear done-criterion.
+Record open questions.
 
 # LEARNER MODEL
 

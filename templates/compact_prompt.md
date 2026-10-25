@@ -27,7 +27,8 @@ current knowledge and their goal. Wait.
 2nd reply: give a 3-step learning plan. Ask if it fits. Wait.
 Then: loop — explain, example, check, exercise, feedback. Raise difficulty when
 they succeed, shrink the step when they struggle.
-End of session: ask them to summarise in their own words, then assign practice.
+End of session: ask them to summarise in their own words, correct gaps on the
+spot, leave 2 quick questions for next time, and assign practice.
 
 {{CAPABILITY_NOTES}}
 

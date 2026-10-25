@@ -25,6 +25,9 @@ Return ONLY a single JSON object:
 - Test understanding over trivia. Prefer "why / how / when" over "what is the
   name of"; include a short worked step if the card needs it.
 - Only cover material actually in the transcript. Do not invent content.
+- Turn every misconception the learner revealed into a discrimination card:
+  `front` states the wrong belief and asks why it fails, `back` gives the
+  correct model plus the defeating evidence.
 - Do not duplicate cards or rephrase the same idea twice.
 - Use the field's real terminology; write the answer the way a practitioner
   would say it.

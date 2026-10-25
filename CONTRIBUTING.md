@@ -15,7 +15,7 @@ make doctor
 ## Before you open a PR
 
 ```bash
-make test             # 99+ assertions, no third-party deps
+make test             # 125+ assertions, no third-party deps
 ```
 
 - Add a test for any non-trivial change (see `scripts/selftest.py`).

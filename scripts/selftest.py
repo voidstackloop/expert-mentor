@@ -214,6 +214,31 @@ def main() -> int:
         code = em.main(["run", "--field", "Rust"])
     check("generic run refused", code == 2)
 
+    print("\nagent provider (keyless, no terminal backend):")
+    buf = io.StringIO()
+    with _rso(buf):
+        code = em.main(["--field", "Rust", "--provider", "agent", "--emit", "text"])
+    check("agent prompt exit 0", code == 0 and "TEACHING CONTRACT" in buf.getvalue())
+    check("agent prompt needs no key", "agent's own model" in buf.getvalue())
+    buf = io.StringIO()
+    with _rso(buf):
+        code = em.main(["run", "--field", "Rust", "--provider", "agent", "--dry-run"])
+    try:
+        payload = json.loads(buf.getvalue())
+        check("agent relay dry-run valid json",
+              code == 0 and payload.get("keys_required") == [] and "system" in payload)
+    except json.JSONDecodeError:
+        check("agent relay dry-run valid json", False)
+    buf = io.StringIO()
+    with _rso(buf):
+        code = em.main(["run", "--field", "Rust", "--provider", "agent",
+                        "--once", "hi"])
+    check("agent --once refused with guidance", code == 2)
+    with _rso(io.StringIO()):
+        code = em.main(["models", "--provider", "agent"])
+    check("agent in model catalog", code == 0)
+    check("manual alias resolves to agent", em.canonical_provider("manual") == "agent")
+
     print("\nlearner memory:")
     import mentor_memory as mm
     old_config = em.CONFIG_DIR
@@ -262,9 +287,54 @@ def main() -> int:
             check("apply sets level", probe.level == "advanced")
             check("apply stores notes", "solid basics" in probe.notes)
             check("apply reports a diff", any("mastered" in c for c in changes))
-            with _rso(io.StringIO()):
+            buf = io.StringIO()
+            with _rso(buf):
                 code = em.main(["review", "rusty", "--dry-run"])
             check("review dry-run", code == 0)
+            check("review schema banks retrieval questions",
+                  "retrieval_questions" in buf.getvalue())
+            buf = io.StringIO()
+            with _rso(buf):
+                code = em.main(["--field", "Rust", "--provider", "ollama",
+                                "--compact", "--emit", "text"])
+            check("compact prompt closes with banked questions",
+                  code == 0 and "2 quick questions for next time" in buf.getvalue())
+            check("cards prompt targets misconceptions",
+                  "discrimination card" in (em.TEMPLATES_DIR / "cards_prompt.md").read_text())
+            buf = io.StringIO()
+            with _rso(buf):
+                code = em.main(["review", "rusty", "--provider", "agent", "--dry-run"])
+            check("agent review dry-run prints paste prompt",
+                  code == 0 and "agent app" in buf.getvalue())
+            with _rso(io.StringIO()):
+                code = em.main(["review", "rusty", "--provider", "agent"])
+            check("agent review without dry-run refused with guidance", code == 2)
+            canned = json.dumps({
+                "level": "intermediate", "summary": "covered ownership",
+                "mastered": ["ownership"], "shaky": ["lifetimes"],
+                "misconceptions": [], "open_questions": [],
+                "next_lesson": "lifetimes in structs",
+                "retrieval_questions": ["Who owns a value?", "What happens on move?",
+                                        "When does the borrow checker complain?"],
+            })
+            real_complete = mr.complete
+            mr.complete = lambda *a, **k: canned
+            try:
+                buf = io.StringIO()
+                with _rso(buf):
+                    code = em.main(["review", "rusty", "--apply"])
+            finally:
+                mr.complete = real_complete
+            check("review prints banked retrieval questions",
+                  code == 0 and "retrieval questions banked" in buf.getvalue()
+                  and "Who owns a value?" in buf.getvalue())
+            check("review apply persists assessed profile",
+                  "lifetimes" in em.get_memory().load("rusty").shaky
+                  and "ownership" in em.get_memory().load("rusty").mastered)
+            with _rso(io.StringIO()):
+                code = em.main(["cards", "rusty", "--generate",
+                                "--provider", "agent", "--dry-run"])
+            check("agent cards dry-run prints paste prompt", code == 0)
         finally:
             em.CONFIG_DIR = old_config
 
@@ -338,6 +408,27 @@ def main() -> int:
         with _rso(io.StringIO()):
             code = em.main(["skill", "--dir", str(target_root)])
         check("re-running is idempotent (no --force needed)", code == 0)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        bundle_dir = Path(tmp) / "bundles"
+        with _rso(io.StringIO()):
+            code = em.main(["skill", "--bundle", str(bundle_dir)])
+        import zipfile
+        zips = sorted(bundle_dir.glob("expert-mentor-*.zip"))
+        check("bundle builds one zip per host", code == 0 and len(zips) == 5)
+        check("agensi bundle included",
+              (bundle_dir / "expert-mentor-agensi.zip").exists())
+        with _rso(io.StringIO()):
+            code = em.main(["skill", "--validate"])
+        check("skill validates against the spec", code == 0)
+        check("bundle zips contain SKILL.md",
+              bool(zips) and all("expert-mentor/SKILL.md" in zipfile.ZipFile(z).namelist()
+                                 for z in zips))
+        check("bundle zips carry the master prompt",
+              bool(zips) and all("expert-mentor/templates/mentor_system_prompt.md"
+                                 in zipfile.ZipFile(z).namelist() for z in zips))
+        check("consolidation banks retrieval questions",
+              "retrieval questions" in (em.TEMPLATES_DIR / "mentor_system_prompt.md").read_text())
 
     with tempfile.TemporaryDirectory() as tmp:
         foreign_root = Path(tmp)

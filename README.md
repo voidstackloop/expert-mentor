@@ -39,15 +39,21 @@ one concept at a time, checking understanding, and never fabricating sources.
 - **Provider-native prompts** — XML-shaped, prompt-cached system blocks for
   Claude; `developer` role, `max_completion_tokens`, and `reasoning_effort` for
   ChatGPT reasoning models; correct handling for Gemini, Ollama, and llama.cpp.
-- **Live tutoring sessions** over Anthropic, OpenAI, Ollama, and llama.cpp —
-  standard library only, no runtime dependencies.
+- **Live tutoring sessions** over Anthropic, OpenAI, Gemini, Ollama, and
+  llama.cpp — standard library only, no runtime dependencies.
+- **No API key required** — the keyless `agent` relay uses your agent app as the
+  model (`mentor run --field "Rust" --provider agent --remember`), with
+  transcripts, memory, review, and cards all working.
 - **Persistent learner memory** — mastered / shaky / misconceptions / open
   questions, injected into every future session.
 - **Model-assisted review** — turn a session transcript into an updated profile.
 - **Spaced repetition** — generate flashcards from a session and review them with
   an SM-2-lite scheduler (`mentor cards` / `mentor quiz`).
 - **Curriculum design** — a structured, sequenced multi-week plan for any field.
-- **Usable as an agent skill** — ships with `SKILL.md` for Claude Code / opencode.
+- **Usable as an agent skill** — ships with `SKILL.md` for Claude Code / opencode,
+  works with no terminal or API keys in hosted skills (e.g. ChatGPT): the
+  host agent is the model and teaches inline. `mentor skill --bundle` builds
+  upload-ready zips for ChatGPT, Claude, opencode, Agensi, and generic hosts.
 
 ## Install
 
@@ -94,8 +100,15 @@ mentor run --field "Rust" --provider chatgpt --model gpt-5.6 --reasoning-effort 
 mentor run --field "music theory" --provider ollama --host http://localhost:11434
 ```
 
-Credentials come from the environment or a `.env` file
-(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`). See
+No API key? Use the keyless relay (`--provider agent` — your agent's own app
+is the model, nothing to install or pay per call) or a local model:
+
+```bash
+mentor run --field "Rust" --provider agent --remember
+```
+
+Cloud credentials come from the environment or a `.env` file
+(`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) and are never printed by any command. See
 [docs/providers.md](docs/providers.md).
 
 ## Remembering a learner
@@ -134,6 +147,8 @@ Profiles, transcripts, prompts, and cards live under
 | `mentor config` | saved defaults |
 | `mentor doctor` | health check |
 | `mentor skill` | install the Claude Code / opencode skill (pip/pipx installs included) |
+| `mentor skill --bundle DIR` | upload-ready skill zips for ChatGPT, Claude, opencode, Agensi, generic hosts |
+| `mentor skill --validate` | Agent Skills spec check before uploading a bundle |
 | `mentor interactive` | build a profile by answering prompts |
 
 Full reference: [docs/commands.md](docs/commands.md).

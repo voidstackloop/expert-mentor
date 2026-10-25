@@ -111,6 +111,26 @@ mentor ollama rusttutor --field "Rust" --compact
 
 Without the installer, replace `mentor` with `python3 scripts/expert_mentor.py`.
 
+### No terminal? (hosted skills, e.g. ChatGPT — no CLI, no API keys)
+
+The skill works with zero commands. You are the model, so build the prompt by
+hand instead of running the generator:
+
+1. Read `templates/mentor_system_prompt.md` (below the `SYSTEM PROMPT` banner).
+2. Fill the slots yourself: `{{MENTOR_NAME}}` (pick one, or one from
+   `references/fields.md` for a curated field), `{{FIELD}}`, `{{LEVEL}}`
+   (beginner/intermediate/advanced/expert), `{{LEARNER_CONTEXT}}`,
+   `{{SESSION_GOAL}}`, `{{LANGUAGE}}`, `{{TEACHING_STYLE}}`, `{{FIELD_NOTES}}`
+   (copy the field's notes/concepts/misconceptions from `references/fields.md`,
+   or write 3–6 lines for a new field), `{{TONE}}` / `{{LENGTH_RULE}}`
+   (warm, direct, concise), `{{CAPABILITY_NOTES}}` (you are a strong cloud
+   model: maintain a detailed learner model, use rich analogies, cite only
+   real verifiable sources), `{{LEARNER_HISTORY}}` (empty on a first session).
+3. Adopt the result as your persona and teach inline per Step 4 — no API key,
+   no backend call, no terminal needed. Learner memory is just the
+   mastered/shaky/misconception lists: keep them in the conversation and hand
+   them back at the end so the user can persist them.
+
 Commands:
 
 | Command | Purpose |
@@ -264,6 +284,13 @@ exception. The non-negotiables:
 
 If handing off, tell the user exactly where to paste the output and how to set
 the temperature (the script prints a recommended value).
+
+End every session with a handoff the next session can use, even in a fresh
+chat with no memory: the learner's self-summary (corrected), 3 banked
+retrieval questions ordered easy→hard, the 1–2 misconceptions to watch with
+their defeating evidence, and the independent-practice assignment. In hosted
+skills with no files, print the mastered / shaky / misconception / open-question
+lists so the user can persist them.
 
 ## Files
 

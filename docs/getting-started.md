@@ -45,17 +45,28 @@ mentor --field "Rust" --provider chatgpt --emit json
 mentor --field "Rust" --provider ollama --emit modelfile
 ```
 
-## First live session
+## First live session (no API key needed)
 
 ```bash
+# Keyless: your agent's own app is the model — paste + relay
+mentor run --field "Rust" --provider agent --remember
+
+# Or local, also keyless:
 mentor run --field "Rust" --provider ollama --model qwen2.5:7b
 ```
+
+With `--provider agent`, paste the shown system prompt into your agent app
+(Claude/ChatGPT/Gemini app, Claude Code, opencode — its own subscription, no
+key), chat there, and relay each turn back in the terminal: type your message
+at `you ›`, paste the app's reply at `mentor ›`, finish the paste with `/end`.
+The session is saved, so `--remember` / `review` / `cards` keep working.
 
 Inside a session:
 
 - `/reset` clears the conversation history
 - `/exit` (or Ctrl-C) quits
-- Token usage is printed after each turn on stderr
+- Token usage is printed after each turn on stderr (network sessions only —
+  the keyless relay makes no backend call, so there is nothing to meter)
 
 To use a cloud provider, set an API key first:
 

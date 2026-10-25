@@ -39,7 +39,7 @@ except ImportError:  # when imported without scripts/ on sys.path
     import mentor_cards
 
 APP_NAME = "expert-mentor"
-__version__ = "0.6.1"
+__version__ = "0.7.0"
 
 
 def _resource_dir(*parts: str) -> Path:
@@ -435,8 +435,17 @@ OPENAI_NOTES = (
       "learner oriented with explicit next steps."
 )
 
+AGENT_NOTES = (
+    "You are the agent's own model (no API key, no separate backend call). "
+    "Teach directly in this conversation: follow the session flow, keep one concept "
+    "per turn, check understanding with a retrieval question, and keep a running "
+    "learner model. You may reference specific, real, verifiable sources — but only "
+    "when you are confident they exist. Never fabricate facts, citations, or APIs."
+)
+
 PROVIDERS: Dict[str, Provider] = {
     "generic": Provider("generic", 0.6, mentor_runtime.DEFAULT_MODELS["generic"], CLOUD_NOTES, "text"),
+    "agent": Provider("agent", 0.6, mentor_runtime.DEFAULT_MODELS["agent"], AGENT_NOTES, "text"),
     "anthropic": Provider("anthropic", 0.7, mentor_runtime.DEFAULT_MODELS["anthropic"], ANTHROPIC_NOTES, "json"),
     "openai": Provider("openai", 0.7, mentor_runtime.DEFAULT_MODELS["openai"], OPENAI_NOTES, "json"),
     "google": Provider("google", 0.8, mentor_runtime.DEFAULT_MODELS["google"], CLOUD_NOTES, "json"),
@@ -454,6 +463,11 @@ PROVIDER_ALIASES = {
     "openai-api": "openai",
     "gemini": "google",
     "local": "ollama",
+    "manual": "agent",
+    "own": "agent",
+    "byom": "agent",
+    "clipboard": "agent",
+    "passthrough": "agent",
 }
 
 
@@ -742,10 +756,21 @@ def run_doctor() -> int:
         healthy = False
 
     mentor_runtime.load_env()
-    for prov in ("anthropic", "openai"):
+    # Keyless first: agent relay + local backends need no keys. Keys are only
+    # ever reported as set/not-set — values are never printed.
+    line("ok", "agent relay available — no API key needed (mentor run --provider agent)")
+    for prov in ("anthropic", "openai", "google"):
         key = mentor_runtime.api_key(prov)
         line("ok" if key else "warn",
              f"{prov} API key {'set' if key else 'not set'} · default model {mentor_runtime.DEFAULT_MODELS[prov]}")
+    for env_path in (Path(os.getcwd()) / ".env", CONFIG_DIR / ".env"):
+        try:
+            if env_path.is_file():
+                mode = env_path.stat().st_mode
+                if mode & 0o077:
+                    line("warn", f"{env_path} is readable by others — run: chmod 600 {env_path}")
+        except OSError:
+            pass
 
     memory = get_memory()
     try:
@@ -861,14 +886,26 @@ def run_ollama_command(rest: List[str]) -> int:
 
 def run_skill_command(rest: List[str]) -> int:
     parser = argparse.ArgumentParser(prog="mentor skill", add_help=True,
-                                     description="Install the Claude Code / opencode agent skill "
-                                                 "(works for pip/pipx installs, not just git checkouts).")
+                                     description="Install the agent skill locally, build upload-ready "
+                                                 "bundles per host (--bundle), or validate the package "
+                                                 "against the Agent Skills spec (--validate).")
     parser.add_argument("--dir", action="append", metavar="PATH",
                         help="install into PATH/expert-mentor instead of the default locations "
                              "(repeatable)")
     parser.add_argument("--force", action="store_true",
                         help="overwrite an existing skill directory that isn't already ours")
+    parser.add_argument("--bundle", metavar="DIR",
+                        help="build one upload-ready zip per host (chatgpt, claude, opencode, "
+                             "generic, agensi) into DIR instead of installing")
+    parser.add_argument("--validate", action="store_true",
+                        help="check the skill package against the Agent Skills spec "
+                             "(frontmatter, naming, size, file refs)")
     opts = parser.parse_args(rest)
+
+    if opts.bundle:
+        return run_skill_bundle(opts.bundle)
+    if getattr(opts, "validate", False):
+        return run_skill_validate()
 
     if not SKILL_MD.exists():
         print(f"SKILL.md not found (looked near {SKILL_MD}); nothing to install", file=sys.stderr)
@@ -908,6 +945,158 @@ def run_skill_command(rest: List[str]) -> int:
         return 1
     print("\nRestart Claude Code / opencode (or start a new session) to pick it up.")
     return 0
+
+
+SKILL_BUNDLE_TARGETS = {
+    "chatgpt": (
+        "ChatGPT / hosted agent skills — no terminal or API key needed.\n"
+        "If your app accepts skill uploads, upload this zip as-is. Otherwise unzip\n"
+        "it and point the app at the expert-mentor/ folder. The host model reads\n"
+        "SKILL.md, builds the mentor prompt by hand (see the 'No terminal?' box),\n"
+        "and teaches inline."
+    ),
+    "claude": (
+        "Claude Code — unzip so the folder lands at\n"
+        "~/.claude/skills/expert-mentor/ with SKILL.md at its root, then restart\n"
+        "Claude Code (or start a new session). Keyless terminal relay is also\n"
+        "available: mentor run --field '...' --provider agent."
+    ),
+    "opencode": (
+        "opencode — unzip so the folder lands at\n"
+        "~/.config/opencode/skills/expert-mentor/ with SKILL.md at its root, then\n"
+        "restart opencode. Keyless terminal relay is also available:\n"
+        "mentor run --field '...' --provider agent."
+    ),
+    "generic": (
+        "Any host that loads SKILL.md skills (Cursor, Gemini, other agent apps) —\n"
+        "unzip and register the expert-mentor/ folder as a skill, or paste a\n"
+        "generated prompt (mentor --field '...' --provider agent) as a system\n"
+        "instruction. No API key is ever required for the agent-relay path."
+    ),
+    "agensi": (
+        "Agensi (agensi.io) — the skill marketplace for AI agents. This zip holds\n"
+        "the listable package: one expert-mentor/ folder with SKILL.md at its\n"
+        "root (folder name matches the frontmatter name, per the Agent Skills\n"
+        "spec). List it on Agensi as a SKILL.md skill — buyers load it through\n"
+        "Agensi MCP into any of the supported agent apps, where the host model\n"
+        "teaches inline with no terminal or API key (see the 'No terminal?' box\n"
+        "in SKILL.md). Run 'mentor skill --validate' before listing to confirm\n"
+        "the package meets the spec (frontmatter, naming, size, file refs)."
+    ),
+}
+
+
+def run_skill_bundle(outdir: str) -> int:
+    """Build one upload-ready zip per host skill store (stdlib only)."""
+    import zipfile
+
+    if not SKILL_MD.exists():
+        print(f"SKILL.md not found (looked near {SKILL_MD}); nothing to bundle", file=sys.stderr)
+        return 1
+    out = Path(outdir).expanduser()
+    out.mkdir(parents=True, exist_ok=True)
+
+    payloads: List[tuple] = [(Path("expert-mentor/SKILL.md"), SKILL_MD)]
+    for dirname, resolved in (("templates", TEMPLATES_DIR), ("references", REFERENCES_DIR)):
+        if not resolved.exists():
+            continue
+        for path in sorted(resolved.rglob("*")):
+            if path.is_file() and path.suffix in (".md", ".json"):
+                payloads.append((Path("expert-mentor") / dirname / path.relative_to(resolved), path))
+
+    made = []
+    for target, notes in SKILL_BUNDLE_TARGETS.items():
+        zip_path = out / f"expert-mentor-{target}.zip"
+        readme = (
+            f"expert-mentor {__version__} — {target} skill bundle\n\n"
+            f"{notes}\n\nContents: SKILL.md + templates/ + references/. "
+            f"Skill auto-activates when the user asks to learn, be taught, or be "
+            f"mentored in any field.\n"
+        )
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr(str(Path("expert-mentor/README-FIRST.txt")), readme)
+            for arcname, source in payloads:
+                archive.write(source, arcname)
+        made.append(zip_path)
+        print(f"bundled: {zip_path}")
+    print(f"\n{len(made)} bundles in {out} — upload the one matching the host app.")
+    return 0
+
+
+def run_skill_validate() -> int:
+    """Check the skill package against the Agent Skills spec (stdlib only).
+
+    Validates the exact tree that gets bundled/uploaded (staged under a
+    directory named after the skill), so it passes from git checkouts, pip
+    installs, and worktrees alike.
+    """
+    import tempfile
+
+    problems: List[str] = []
+    if not SKILL_MD.exists():
+        print(f"SKILL.md not found (looked near {SKILL_MD}); nothing to validate", file=sys.stderr)
+        return 1
+    with tempfile.TemporaryDirectory() as tmp:
+        pre = re.match(r"^---\n(.*?)\n---\n", SKILL_MD.read_text(encoding="utf-8"), re.S)
+        pre_name = re.search(r"^name:\s*(.*)", pre.group(1), re.M).group(1).strip() if pre else "skill"
+        root = Path(tmp) / pre_name
+        (root / "templates").mkdir(parents=True)
+        (root / "references").mkdir(parents=True)
+        shutil.copy2(SKILL_MD, root / "SKILL.md")
+        for dirname, resolved in (("templates", TEMPLATES_DIR), ("references", REFERENCES_DIR)):
+            if resolved.exists():
+                for path in resolved.rglob("*"):
+                    if path.is_file() and path.suffix in (".md", ".json"):
+                        shutil.copy2(path, root / dirname / path.name)
+        text = (root / "SKILL.md").read_text(encoding="utf-8")
+        problems = _validate_skill_tree(root, text)
+    if problems:
+        print("skill validation FAILED:")
+        for problem in problems:
+            print(f"  - {problem}")
+        return 1
+    return 0
+
+
+def _validate_skill_tree(root: Path, text: str) -> List[str]:
+    """Pure spec checks over a staged skill directory; returns problem strings."""
+    problems: List[str] = []
+    match = re.match(r"^---\n(.*?)\n---\n", text, re.S)
+    if not match:
+        problems.append("SKILL.md has no YAML frontmatter block")
+        front = ""
+    else:
+        front = match.group(1)
+
+    def field(key: str) -> str:
+        found = re.search(rf"^{key}:\s*(.*)", front, re.M)
+        return found.group(1).strip().strip("'\"") if found else ""
+
+    name, description = field("name"), field("description")
+    if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name or "-"):
+        problems.append(f"invalid name {name!r} (lowercase alphanumerics + hyphens; "
+                        "no leading/trailing/double hyphens)")
+    if len(name) > 64:
+        problems.append("name exceeds 64 characters")
+    if root.name != name:
+        problems.append(f"skill directory {root.name!r} does not match frontmatter name {name!r}")
+    if not description:
+        problems.append("description is empty")
+    if len(description) > 1024:
+        problems.append(f"description is {len(description)} chars (max 1024)")
+    body_lines = text.splitlines()
+    if len(body_lines) > 500:
+        problems.append(f"SKILL.md is {len(body_lines)} lines (keep under 500; move detail to references/)")
+    for ref in sorted(set(re.findall(r"[`(](templates/[\w.-]+|references/[\w.-]+)", text))):
+        if not (root / ref).exists():
+            problems.append(f"referenced file missing: {ref}")
+    for dirname in ("templates", "references"):
+        if not (root / dirname).exists():
+            problems.append(f"missing directory: {dirname}/ (needed for no-terminal hosts)")
+    if not problems:
+        print(f"skill valid: name={name} · description={len(description)} chars · "
+              f"{len(body_lines)} lines · all refs resolve")
+    return problems
 
 
 def run_models_command(rest: List[str]) -> int:
@@ -1152,6 +1341,22 @@ def run_review_command(rest: List[str]) -> int:
     field_name = (learner.field if learner else "") or meta.get("field", "")
 
     provider = canonical_provider(opts.provider or meta.get("provider") or "ollama")
+    if provider == "agent":
+        system = _review_system_prompt(field_name, provider)
+        transcript = path.read_text(encoding="utf-8")
+        if opts.dry_run:
+            print("=== system (paste into your agent app with the transcript below) ===")
+            print(system)
+            print("\n=== user (transcript) ===")
+            print(transcript)
+            return 0
+        print("provider 'agent' cannot assess by itself: paste the review prompt into "
+              "your agent app.\n"
+              f"Run: mentor review {learner_name or ''} --provider agent --dry-run".strip()
+              + "\nThen apply the result by hand with 'mentor progress NAME --add-mastered ...'.\n"
+              "Or run review with a backend: --provider ollama (no key) or a cloud key.",
+              file=sys.stderr)
+        return 2
     if provider not in ("ollama", "llamacpp", "openai", "anthropic", "google"):
         print(f"provider '{provider}' has no runtime backend; pass --provider", file=sys.stderr)
         return 2
@@ -1194,6 +1399,12 @@ def run_review_command(rest: List[str]) -> int:
     if learner is None:
         print("\n(no learner profile — pass a learner name with --apply to save these)")
         return 0
+
+    banked = data.get("retrieval_questions")
+    if isinstance(banked, list) and any(str(q).strip() for q in banked):
+        print("\nretrieval questions banked for next session (easiest first):")
+        for index, question in enumerate([q for q in banked if str(q).strip()], 1):
+            print(f"  {index}. {question}")
 
     changes = mentor_memory.apply_updates(learner, data)
     print("\nproposed changes:")
@@ -1299,6 +1510,22 @@ def _generate_cards(opts: argparse.Namespace, store: "mentor_cards.CardStore") -
     field_name = (learner.field if learner else "") or meta.get("field", "")
 
     provider = canonical_provider(opts.provider or meta.get("provider") or "ollama")
+    if provider == "agent":
+        system = _cards_system_prompt(field_name, provider)
+        transcript = path.read_text(encoding="utf-8")
+        if opts.dry_run:
+            print("=== system (paste into your agent app with the transcript below) ===")
+            print(system)
+            print("\n=== user (transcript) ===")
+            print(transcript)
+            return 0
+        print("provider 'agent' cannot generate cards by itself: paste the cards prompt "
+              "into your agent app.\n"
+              f"Run: mentor cards {opts.learner} --generate --provider agent --dry-run".strip()
+              + "\nThen add each card by hand with 'mentor cards NAME --add \"Q :: A\"'.\n"
+              "Or generate with a backend: --provider ollama (no key) or a cloud key.",
+              file=sys.stderr)
+        return 2
     if provider not in ("ollama", "llamacpp", "openai", "anthropic", "google"):
         print(f"provider '{provider}' has no runtime backend; pass --provider", file=sys.stderr)
         return 2
@@ -1455,6 +1682,120 @@ def _print_usage(usage: Dict, quiet: bool = False) -> None:
         print(f"[usage] {'  '.join(parts)}", file=sys.stderr)
 
 
+def run_agent_relay(args: argparse.Namespace, system_prompt: str, label: str,
+                     meta: Dict, learner, memory: "mentor_memory.Memory") -> int:
+    """Keyless relay session: the host agent's own app is the model.
+
+    No API key is read, sent, or stored here — the user pastes the system
+    prompt into their own agent app (subscription, not API key) and relays
+    the turns back so transcripts, learner memory, review, and cards keep
+    working. Transcripts never contain keys (there are none to leak).
+    """
+    if args.out:
+        Path(args.out).write_text(system_prompt, encoding="utf-8")
+        print(f"wrote system prompt to {args.out} — paste it into your agent app, "
+              f"then relay the turns here.")
+    if args.dry_run:
+        print(json.dumps({
+            "provider": "agent",
+            "model": "agent's own model (no API call)",
+            "system": system_prompt,
+            "how_to_use": ("paste 'system' into your agent app (Claude/ChatGPT/Gemini "
+                             "app, Claude Code, opencode), chat there, then relay each "
+                             "learner message + mentor reply here so the session is saved"),
+            "keys_required": [],
+        }, indent=2, ensure_ascii=False))
+        return 0
+    if args.once:
+        print("provider 'agent' cannot answer --once by itself: there is no backend call.\n"
+              "Paste the system prompt (mentor --provider agent --out prompt.md) into your\n"
+              "agent app along with your message, then use 'mentor run --provider agent'\n"
+              "to record the full session for memory/review/cards.", file=sys.stderr)
+        return 2
+
+    header = f"expert-mentor · {label} · provider=agent (keyless relay — no API key)"
+    if learner is not None:
+        header += f" · learner={learner.name} (session {learner.sessions + 1})"
+    print(header)
+    print("Your agent app is the model: paste the system prompt there, chat there,")
+    print("and relay each turn here so it is saved for memory / review / cards.")
+    print("Commands: /reset  /exit   (end a pasted mentor reply with a line: /end)\n")
+    if not args.quiet:
+        print("--- system prompt (paste into your agent app) ---")
+        print(system_prompt.rstrip() + "\n")
+        print("--- end system prompt ---\n")
+    else:
+        print("(quiet: system prompt hidden — re-run without -q to show it, "
+              "or use --out prompt.md)\n")
+
+    def save_progress(session_messages: List[Dict]) -> None:
+        if learner is None or not session_messages:
+            return
+        learner.sessions += 1
+        path = memory.add_session(learner, session_messages, "agent",
+                                  "agent's own model", args.field or meta.get("field", ""))
+        memory.save(learner)
+        if path and not args.quiet:
+            print(f"[saved] learner '{learner.name}' → {path}", file=sys.stderr)
+
+    def read_mentor_reply() -> Optional[str]:
+        print("mentor › paste the reply from your app (finish with a line: /end)")
+        lines: List[str] = []
+        while True:
+            try:
+                raw = input()
+            except EOFError:
+                return None if not lines else "\n".join(lines)
+            stripped = raw.strip()
+            if stripped in ("/end", "/done") or (stripped == "." and lines):
+                break
+            if stripped in ("/exit", "/quit") and not lines:
+                return None
+            if stripped == "/reset" and not lines:
+                return "__reset__"
+            lines.append(raw)
+        text = "\n".join(lines).strip()
+        return text or None
+
+    messages: List[Dict] = []
+    try:
+        while True:
+            try:
+                user = input("you › ")
+            except EOFError:
+                break
+            if not user.strip():
+                continue
+            if user.strip() in ("/exit", "/quit"):
+                break
+            if user.strip() == "/reset":
+                messages = []
+                print("(history cleared)")
+                continue
+            messages.append({"role": "user", "content": user})
+            reply = read_mentor_reply()
+            if reply is None:
+                messages.pop()
+                break
+            if reply == "__reset__":
+                messages = []
+                print("(history cleared)")
+                continue
+            if reply:
+                messages.append({"role": "assistant", "content": reply})
+                print("(recorded — continue in your app)\n")
+    except KeyboardInterrupt:
+        print()
+    save_progress(messages)
+    if messages and learner is not None:
+        print(f"\nNext (all keyless): assess with\n"
+              f"  mentor review {learner.name} --provider agent --dry-run"
+              f"\nthen apply by hand via 'mentor progress {learner.name} ...', "
+              f"and bank cards with\n"
+              f"  mentor cards {learner.name} --generate --provider agent --dry-run")
+    return 0
+
+
 def run_run_command(rest: List[str]) -> int:
     name: Optional[str] = None
     if rest and not rest[0].startswith("-"):
@@ -1478,17 +1819,7 @@ def run_run_command(rest: List[str]) -> int:
         provider = args.provider
         label = args._profile.key
 
-    runtime_providers = {"ollama", "llamacpp", "openai", "anthropic", "google"}
-    if provider not in runtime_providers:
-        print(
-            f"provider '{provider}' cannot run a live session.\n"
-            f"Pick one of: {', '.join(sorted(runtime_providers))}.\n"
-            f"Example: mentor run {name or '<name>'} --provider ollama --model llama3.1:8b",
-            file=sys.stderr,
-        )
-        return 2
-
-    # --- persistent learner model -------------------------------------- #
+    # --- persistent learner model (shared by network + agent relay) ------ #
     memory = get_memory()
     learner = None
     learner_name = getattr(args, "learner", None)
@@ -1508,6 +1839,22 @@ def run_run_command(rest: List[str]) -> int:
         if learner.has_history():
             system_prompt = mentor_memory.inject_learner_history(
                 system_prompt, mentor_memory.render_learner_section(learner))
+
+    # Keyless relay: the host agent's own app is the model. No key, no network.
+    if provider == "agent":
+        return run_agent_relay(args, system_prompt, label, meta, learner, memory)
+
+    runtime_providers = {"ollama", "llamacpp", "openai", "anthropic", "google"}
+    if provider not in runtime_providers:
+        print(
+            f"provider '{provider}' cannot run a live session.\n"
+            f"No API key? Use the keyless relay: mentor run {name or '--field \"...\"'} "
+            f"--provider agent\n"
+            f"Local model? Use: mentor run {name or '<name>'} --provider ollama\n"
+            f"Cloud backends: {', '.join(sorted(runtime_providers))}.",
+            file=sys.stderr,
+        )
+        return 2
 
     model = args.model or meta.get("model") or mentor_runtime.DEFAULT_MODELS.get(provider, "")
     temperature = (args.temperature if args.temperature is not None

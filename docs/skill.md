@@ -48,6 +48,33 @@ turn a provider or local LLM into a teacher. Examples:
    `mentor --field "Rust" --provider claude --emit json`.
 4. **Runs the session** following the teaching contract, or hands the prompt off.
 
+## Hosted skills with no terminal (e.g. ChatGPT skills)
+
+Build upload-ready zips with one command:
+
+```bash
+mentor skill --bundle ./bundles   # chatgpt, claude, opencode, generic, agensi zips
+mentor skill --validate            # spec check before uploading anywhere
+```
+
+Upload the skill directory (`SKILL.md` + `templates/` + `references/` —
+exactly what `mentor skill` installs for pip/pipx users) wherever hosted
+skills live. No CLI, no API keys, no backend calls are needed there: the host
+agent is the model. It reads `templates/mentor_system_prompt.md`, fills the
+`{{...}}` slots by hand (field notes come from `references/fields.md`), and
+teaches inline following the teaching contract. Learner memory becomes the
+mastered/shaky/misconception lists carried in the conversation. See the "No
+terminal?" box in [`SKILL.md`](../SKILL.md). An example of the exact payload a
+keyless user works with is [`examples/rust.agent.json`](../examples/rust.agent.json)
+(system prompt + how-to-use, `keys_required: []`).
+
+**Agensi (agensi.io):** upload `expert-mentor-agensi.zip` as a SKILL.md skill
+and list it on the marketplace — buyers load it through Agensi MCP into their
+own agent apps. The package follows the Agent Skills spec (folder name matches
+the frontmatter `name`, description under 1024 chars, body under 500 lines,
+relative one-level file refs); `mentor skill --validate` confirms this before
+you list.
+
 ## Alternative: project or global registration
 
 Instead of symlinks you can register the skill path in your opencode config:
